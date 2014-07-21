@@ -1,0 +1,101 @@
+## A Predictive Model for the Weight Lifting Exercises Dataset
+
+### Synopsis
+
+In this project, we construct a predictive classification model based on the Weight Lifting Exercises dataset.
+
+The training data used for this project is available at https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv, and the test data is available at https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv. Information about this data can be find at http://groupware.les.inf.puc-rio.br/har.
+
+The model classifies how a weight lifting exercise was executed: Exactly according to the specification (class A), or with with a common mistake type (classes B-E).
+
+### Reading the data
+
+```{r cacheChunk1, cache=TRUE}
+library(caret)
+set.seed(123)
+
+training   <- read.csv("pml-training.csv") # training data
+test       <- read.csv("pml-testing.csv" ) # test     data
+```
+
+The training data contains `r dim(training)[1]` cases, and `r dim(training)[2]` variables (`r dim(training)[2]-1` predictors, and the true class). The test data contains `r dim(test)[1]` cases.
+
+### Selecting and preprocessing predictors
+
+First we will remove the index column (which is not a predictor)
+
+```{r cacheChunk2, cache=TRUE}
+training$X <- NULL
+test$X     <- NULL
+```
+
+Next, we will remove predictors where more than 97% of the values are NA:
+
+```{r cacheChunk3, cache=TRUE}
+percentNA  <- as.vector(colMeans(is.na(training)))
+colsNA     <- which(percentNA > 0.97)
+training   <- training[, -colsNA]
+test       <- test    [, -colsNA]
+```
+
+We're now left with `r dim(training)[2]-1` predictors.   
+
+Next, we'll remove all near-zero variance predictors:
+
+```{r cacheChunk4, cache=TRUE}
+nsv        <- nearZeroVar(training)
+training   <- training[, -nsv]
+test       <- test    [, -nsv]
+```
+
+We're now left with `r dim(training)[2]-1` predictors.
+
+We will further reduce the number of predictors using Principal Component Analysis on all non-factor predictors, retaining 99% of the variance:
+
+```{r cacheChunk5, cache=TRUE}
+colsFactor <- as.vector(which(sapply(training, is.factor)))
+preProc    <- preProcess(training[,-colsFactor], method= "pca", thresh= 0.99)
+
+training   <- cbind(predict(preProc, training[, -colsFactor]), training[colsFactor])
+test       <- cbind(predict(preProc, test    [, -colsFactor]), test    [colsFactor])
+```
+
+We're now left with `r dim(training)[2]-1` predictors.
+
+### Building the model
+
+We'll train a random forest model using 10-fold cross validation - on all the training data:
+
+```{r cacheChunk6, cache=TRUE}
+fitControl <- trainControl(method= "cv", number= 10, repeats= 1, verboseIter= F)
+modFit     <- train(classe ~ ., method= "rf" , data= training, trControl= fitControl)
+```
+
+### Evaluating the model
+
+```{r cacheChunk7, cache=TRUE}
+modFit
+```
+
+The estimated accuracy above is misleading since R prints rounded numbers. Here are the real values:
+
+```{r cacheChunk8, cache=TRUE}
+modFit$results
+Accuracy    <- max(modFit$results$Accuracy)
+```
+
+Based on the 10-folds cross validation results, the estimated accuracy of the model is `r Accuracy*100`%. 
+Hence, the out-of-sample error is `r (1-Accuracy)*100`%
+
+Running the model on the train set produce perfect results:
+
+```{r cacheChunk9, cache=TRUE}
+p          <- predict(modFit, training)
+confusionMatrix(p, training$classe)
+```
+
+### Prediction for the test set
+
+```{r cacheChunk10, cache=TRUE}
+predict(modFit, test)
+```

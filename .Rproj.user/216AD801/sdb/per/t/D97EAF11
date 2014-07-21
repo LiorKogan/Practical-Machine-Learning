@@ -1,0 +1,16 @@
+{
+    "contents" : "library(caret)\n\ntraining     <- read.csv(\"pml-training.csv\") # training data\ntest         <- read.csv(\"pml-testing.csv\" ) # test     data\n\n# remove index column (not a predictor)\ntraining$X   <- NULL\ntest$X       <- NULL\n\n# remove raw timestamp columns\n#data$raw_timestamp_part_1 <- NULL\n#validation$raw_timestamp_part_1  <- NULL\n#data$raw_timestamp_part_2 <- NULL\n#validation$raw_timestamp_part_2  <- NULL\n\n# remove predictors where more than 97% of the values are NA\npercentNA  <- as.vector(colMeans(is.na(training)))\ncolsNA     <- which(percentNA > 0.97)\ntraining   <- training[, -colsNA]\ntest       <- test    [, -colsNA]\n\n# remove near-zero variance predictors \nnsv        <- nearZeroVar(training)\ntraining   <- training[, -nsv]\ntest       <- test    [, -nsv]\n\n# find which predictors are factor predictors\ncolsFactor <- as.vector(which(sapply(training, is.factor)))\n\n# ensure reproducability\nset.seed(123)\n\n# further reduce the number of predictors using Principal Component Analysis on training data, retaining 99% of the variance\npreProc    <- preProcess(training[,-colsFactor], method= \"pca\", thresh= 0.99)\n\n# replace training and test sets with PCA results; bind removed factor columns\ntraining   <- cbind(predict(preProc, training[, -colsFactor]), training[colsFactor])\ntest       <- cbind(predict(preProc, test    [, -colsFactor]), test    [colsFactor])\n\n# 10-fold cross-validation random-forest training\nfitControl <- trainControl(method= \"cv\", number= 10, repeats= 1, verboseIter= T)\nmodFit     <- train(classe ~ ., method= \"rf\" , data= training, trControl= fitControl)\n\np          <- predict(modFit, training)\nconfusionMatrix(p, training$classe)\n\n# postResample(p, training$classe)\n\nq          <- predict(modFit, test)\n\n# get structure of trees k in the forest\n# getTree(modFit$finalModel, k= 2)\n",
+    "created" : 1405789411385.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2888235929",
+    "id" : "D97EAF11",
+    "lastKnownWriteTime" : 1405882836,
+    "path" : "C:/My GitHub/Practical_Machine_Learning_Prj/2.R",
+    "project_path" : "2.R",
+    "properties" : {
+    },
+    "source_on_save" : false,
+    "type" : "r_source"
+}
