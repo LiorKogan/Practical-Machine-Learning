@@ -10,7 +10,7 @@ The model classifies how a weight lifting exercise was executed: Exactly accordi
 
 ### Reading the data
 
-```{r cacheChunk1, cache=TRUE}
+```{r}
 library(caret)
 set.seed(123)
 
@@ -24,14 +24,14 @@ The training data contains `r dim(training)[1]` cases, and `r dim(training)[2]` 
 
 First we will remove the index column (which is not a predictor)
 
-```{r cacheChunk2, cache=TRUE}
+```{r}
 training$X <- NULL
 test$X     <- NULL
 ```
 
 Next, we will remove predictors where more than 97% of the values are NA:
 
-```{r cacheChunk3, cache=TRUE}
+```{r}
 percentNA  <- as.vector(colMeans(is.na(training)))
 colsNA     <- which(percentNA > 0.97)
 training   <- training[, -colsNA]
@@ -42,7 +42,7 @@ We're now left with `r dim(training)[2]-1` predictors.
 
 Next, we'll remove all near-zero variance predictors:
 
-```{r cacheChunk4, cache=TRUE}
+```{r}
 nsv        <- nearZeroVar(training)
 training   <- training[, -nsv]
 test       <- test    [, -nsv]
@@ -52,7 +52,7 @@ We're now left with `r dim(training)[2]-1` predictors.
 
 We will further reduce the number of predictors using Principal Component Analysis on all non-factor predictors, retaining 99% of the variance:
 
-```{r cacheChunk5, cache=TRUE}
+```{r}
 colsFactor <- as.vector(which(sapply(training, is.factor)))
 preProc    <- preProcess(training[,-colsFactor], method= "pca", thresh= 0.99)
 
@@ -66,22 +66,16 @@ We're now left with `r dim(training)[2]-1` predictors.
 
 We'll train a random forest model using 10-fold cross validation - on all the training data:
 
-```{r cacheChunk6, cache=TRUE}
+```{r}
 fitControl <- trainControl(method= "cv", number= 10, repeats= 1, verboseIter= F)
 modFit     <- train(classe ~ ., method= "rf" , data= training, trControl= fitControl)
 ```
 
 ### Evaluating the model
 
-```{r cacheChunk7, cache=TRUE}
+```{r}
 modFit
-```
-
-The estimated accuracy above is misleading since R prints rounded numbers. Here are the real values:
-
-```{r cacheChunk8, cache=TRUE}
-modFit$results
-Accuracy    <- max(modFit$results$Accuracy)
+Accuracy   <- max(modFit$results$Accuracy)
 ```
 
 Based on the 10-folds cross validation results, the estimated accuracy of the model is `r Accuracy*100`%. 
@@ -89,13 +83,13 @@ Hence, the out-of-sample error is `r (1-Accuracy)*100`%
 
 Running the model on the train set produce perfect results:
 
-```{r cacheChunk9, cache=TRUE}
+```{r}
 p          <- predict(modFit, training)
 confusionMatrix(p, training$classe)
 ```
 
 ### Prediction for the test set
 
-```{r cacheChunk10, cache=TRUE}
+```{r}
 predict(modFit, test)
 ```
