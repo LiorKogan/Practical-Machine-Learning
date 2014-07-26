@@ -130,7 +130,22 @@ modFit     &lt;- train(classe ~ ., method= &quot;rf&quot; , data= training, trCo
 ## The final value used for the model was mtry = 32.</code></pre>
 <pre class="r"><code>Accuracy   &lt;- max(modFit$results$Accuracy)</code></pre>
 <p>Based on the 10-folds cross validation results, the estimated accuracy of the model is 98.9247%. Hence, the out-of-sample error is 1.0753%</p>
-<p>Running the model on the train set produce perfect results:</p>
+<p>This Accuracy is the average accuracy for the 10 cross-validation folds:</p>
+<pre class="r"><code>modFit$resample</code></pre>
+<pre><code>##    Accuracy  Kappa       Resample
+## 1  0.9892912 0.9864516   Fold02
+## 2  0.9913354 0.9890381   Fold01
+## 3  0.9898063 0.9871054   Fold04
+## 4  0.9847173 0.9806633   Fold03
+## 5  0.9847095 0.9806588   Fold06
+## 6  0.9908350 0.9884077   Fold05
+## 7  0.9933707 0.9916127   Fold08
+## 8  0.9918451 0.9896849   Fold07
+## 9  0.9877676 0.9845238   Fold10
+## 10 0.9887927 0.9858207   Fold09</code></pre>
+<pre class="r"><code>mean(modFit$resample$Accuracy)</code></pre>
+<pre><code>## [1] 0.9892</code></pre>
+<p>Running the model on the train set produce the following results:</p>
 <pre class="r"><code>p          &lt;- predict(modFit, training)
 confusionMatrix(p, training$classe)</code></pre>
 <pre><code>## Confusion Matrix and Statistics
@@ -146,8 +161,8 @@ confusionMatrix(p, training$classe)</code></pre>
 ## Overall Statistics
 ##
 ##                Accuracy : 1
-##                  95% CI : (1, 1)
-##     No Information Rate : 0.284
+##                  95% CI : (0.9998, 1)
+##     No Information Rate : 0.2844
 ##     P-Value [Acc &gt; NIR] : &lt;2e-16
 ##
 ##                   Kappa : 1

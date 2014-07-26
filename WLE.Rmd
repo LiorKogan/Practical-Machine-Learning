@@ -81,7 +81,15 @@ Accuracy   <- max(modFit$results$Accuracy)
 Based on the 10-folds cross validation results, the estimated accuracy of the model is `r Accuracy*100`%. 
 Hence, the out-of-sample error is `r (1-Accuracy)*100`%
 
-Running the model on the train set produce perfect results:
+This Accuracy is the average accuracy for the 10 cross-validation folds:
+
+```{r}
+modFit$resample
+mean(modFit$resample$Accuracy)
+```
+
+
+Running the model on the train set produce the following results:
 
 ```{r}
 p          <- predict(modFit, training)
