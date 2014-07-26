@@ -61,109 +61,127 @@ if (window.hljs && document.readyState && document.readyState === "complete") {
 <p>The training data used for this project is available at <a href="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv">https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv</a>, and the test data is available at <a href="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv">https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv</a>. Information about this data can be find at <a href="http://groupware.les.inf.puc-rio.br/har">http://groupware.les.inf.puc-rio.br/har</a>.</p>
 <p>The model classifies how a weight lifting exercise was executed: Exactly according to the specification (class A), or with with a common mistake type (classes B-E).</p>
 </div>
-<div id="reading-the-data" class="section level3">
-<h3>Reading the data</h3>
+<div id="reading-and-partitioning-the-data" class="section level3">
+<h3>Reading and partitioning the data</h3>
 <pre class="r"><code>library(caret)</code></pre>
 <pre><code>## Loading required package: lattice
 ## Loading required package: ggplot2</code></pre>
 <pre class="r"><code>set.seed(123)
 
-training   &lt;- read.csv(&quot;pml-training.csv&quot;) # training data
-test       &lt;- read.csv(&quot;pml-testing.csv&quot; ) # test     data</code></pre>
-<p>The training data contains 19622 cases, and 160 variables (159 predictors, and the true class). The test data contains 20 cases.</p>
+labeled    &lt;- read.csv(&quot;pml-training.csv&quot;) # training+cv+test data
+unlabeled  &lt;- read.csv(&quot;pml-testing.csv&quot; ) # unlabeled test   data</code></pre>
+<p>The labeled data contains 19622 cases, and 160 variables (159 predictors, and the true class). The unlabeled data contains 20 cases.</p>
+<p>We’ll examine the proportion of the different labels:</p>
+<pre class="r"><code>prop.table(table(labeled$classe))</code></pre>
+<pre><code>##
+##         A         B         C         D         E
+## 0.2843747 0.1935073 0.1743961 0.1638977 0.1838243</code></pre>
+<p>We can see that each label has a decent representation in the labeled set.</p>
+<p>We’ll keep 10% of the labeled data for testing, and use 90% for training/cross-validation (see motivation in “Building the model” below). We’ll random-split the labeled data, stratified by the label:</p>
+<pre class="r"><code>inTrain    &lt;- createDataPartition(y= labeled$classe, p= 0.9, list= F)
+training   &lt;- labeled[ inTrain,]
+test       &lt;- labeled[-inTrain,]</code></pre>
 </div>
 <div id="selecting-and-preprocessing-predictors" class="section level3">
 <h3>Selecting and preprocessing predictors</h3>
 <p>First we will remove the index column (which is not a predictor)</p>
 <pre class="r"><code>training$X &lt;- NULL
-test$X     &lt;- NULL</code></pre>
+test$X     &lt;- NULL
+unlabeled$X&lt;- NULL</code></pre>
 <p>Next, we will remove predictors where more than 97% of the values are NA:</p>
 <pre class="r"><code>percentNA  &lt;- as.vector(colMeans(is.na(training)))
 colsNA     &lt;- which(percentNA &gt; 0.97)
-training   &lt;- training[, -colsNA]
-test       &lt;- test    [, -colsNA]</code></pre>
+training   &lt;- training [, -colsNA]
+test       &lt;- test     [, -colsNA]
+unlabeled  &lt;- unlabeled[, -colsNA]</code></pre>
 <p>We’re now left with 91 predictors.</p>
 <p>Next, we’ll remove all near-zero variance predictors:</p>
 <pre class="r"><code>nsv        &lt;- nearZeroVar(training)
-training   &lt;- training[, -nsv]
-test       &lt;- test    [, -nsv]</code></pre>
+training   &lt;- training [, -nsv]
+test       &lt;- test     [, -nsv]
+unlabeled  &lt;- unlabeled[, -nsv]</code></pre>
 <p>We’re now left with 57 predictors.</p>
 <p>We will further reduce the number of predictors using Principal Component Analysis on all non-factor predictors, retaining 99% of the variance:</p>
 <pre class="r"><code>colsFactor &lt;- as.vector(which(sapply(training, is.factor)))
-preProc    &lt;- preProcess(training[,-colsFactor], method= &quot;pca&quot;, thresh= 0.99)
+preProc    &lt;- preProcess(training[, -colsFactor], method= &quot;pca&quot;, thresh= 0.99)
 
-training   &lt;- cbind(predict(preProc, training[, -colsFactor]), training[colsFactor])
-test       &lt;- cbind(predict(preProc, test    [, -colsFactor]), test    [colsFactor])</code></pre>
+training   &lt;- cbind(predict(preProc, training [, -colsFactor]), training [colsFactor])
+test       &lt;- cbind(predict(preProc, test     [, -colsFactor]), test     [colsFactor])
+unlabeled  &lt;- cbind(predict(preProc, unlabeled[, -colsFactor]), unlabeled[colsFactor])</code></pre>
 <p>We’re now left with 40 predictors.</p>
 </div>
 <div id="building-the-model" class="section level3">
 <h3>Building the model</h3>
-<p>We’ll train a random forest model using 10-fold cross validation - on all the training data:</p>
+<p>We’ll train a random forest model using 10-fold cross validation. The training process optimizes the mtry parameter (number of variables randomly selected at each tree node).</p>
 <pre class="r"><code>fitControl &lt;- trainControl(method= &quot;cv&quot;, number= 10, repeats= 1, verboseIter= F)
 modFit     &lt;- train(classe ~ ., method= &quot;rf&quot; , data= training, trControl= fitControl)</code></pre>
 <pre><code>## Loading required package: randomForest
 ## randomForest 4.6-10
 ## Type rfNews() to see new features/changes/bug fixes.</code></pre>
+<p>Since the validation folds are used to select the final model (best mtry value), the cross-validation error rate estimate may be biased.</p>
+<p>We’ll evaluate the accuracy both for the training/cv set and for the test set:</p>
 </div>
-<div id="evaluating-the-model" class="section level3">
-<h3>Evaluating the model</h3>
+<div id="evaluating-the-model-trainingcross-validation-set" class="section level3">
+<h3>Evaluating the model: training/cross-validation set</h3>
+<p>Note: As stated above: this evaluation may be biased.</p>
 <pre class="r"><code>modFit</code></pre>
 <pre><code>## Random Forest
 ##
-## 19622 samples
+## 17662 samples
 ##    40 predictors
 ##     5 classes: 'A', 'B', 'C', 'D', 'E'
 ##
 ## No pre-processing
 ## Resampling: Cross-Validated (10 fold)
 ##
-## Summary of sample sizes: 17660, 17661, 17659, 17660, 17658, 17660, ...
+## Summary of sample sizes: 15896, 15896, 15896, 15896, 15896, 15895, ...
 ##
 ## Resampling results across tuning parameters:
 ##
 ##   mtry  Accuracy  Kappa  Accuracy SD  Kappa SD
-##   2     0.97      0.963  0.00276      0.0035
-##   32    0.989     0.986  0.00288      0.00364
-##   62    0.982     0.977  0.00374      0.00473
+##   2     0.968     0.959  0.00566      0.00717
+##   32    0.988     0.985  0.00339      0.00429
+##   62    0.981     0.976  0.0038       0.00481
 ##
 ## Accuracy was used to select the optimal model using  the largest value.
 ## The final value used for the model was mtry = 32.</code></pre>
-<pre class="r"><code>Accuracy   &lt;- max(modFit$results$Accuracy)</code></pre>
-<p>Based on the 10-folds cross validation results, the estimated accuracy of the model is 98.9247%. Hence, the out-of-sample error is 1.0753%</p>
-<p>This Accuracy is the average accuracy for the 10 cross-validation folds:</p>
+<pre class="r"><code>AccuracyM  &lt;- max(modFit$results$Accuracy)</code></pre>
+<p>Based on the 10-folds cross validation results, the estimated accuracy of the model is 98.7770186%, with a tight confidence interval. Hence, the out-of-sample error is 1.2229814%</p>
+<p>This estimated model accuracy is the average accuracy for the 10 cross-validation folds:</p>
 <pre class="r"><code>modFit$resample</code></pre>
-<pre><code>##    Accuracy  Kappa       Resample
-## 1  0.9892912 0.9864516   Fold02
-## 2  0.9913354 0.9890381   Fold01
-## 3  0.9898063 0.9871054   Fold04
-## 4  0.9847173 0.9806633   Fold03
-## 5  0.9847095 0.9806588   Fold06
-## 6  0.9908350 0.9884077   Fold05
-## 7  0.9933707 0.9916127   Fold08
-## 8  0.9918451 0.9896849   Fold07
-## 9  0.9877676 0.9845238   Fold10
-## 10 0.9887927 0.9858207   Fold09</code></pre>
+<pre><code>##     Accuracy     Kappa Resample
+## 1  0.9920725 0.9899691   Fold02
+## 2  0.9886750 0.9856789   Fold01
+## 3  0.9915062 0.9892527   Fold04
+## 4  0.9886750 0.9856750   Fold03
+## 5  0.9881154 0.9849645   Fold06
+## 6  0.9892412 0.9863894   Fold05
+## 7  0.9841360 0.9799297   Fold08
+## 8  0.9886814 0.9856782   Fold07
+## 9  0.9807475 0.9756447   Fold10
+## 10 0.9858517 0.9821034   Fold09</code></pre>
 <pre class="r"><code>mean(modFit$resample$Accuracy)</code></pre>
-<pre><code>## [1] 0.9892</code></pre>
-<p>Running the model on the train set produce the following results:</p>
-<pre class="r"><code>p          &lt;- predict(modFit, training)
-confusionMatrix(p, training$classe)</code></pre>
+<pre><code>## [1] 0.9877702</code></pre>
+<p>Running the model on the training/cv set produce the following results:</p>
+<pre class="r"><code>p1         &lt;- predict(modFit, training)
+m1         &lt;- confusionMatrix(p1, training$classe)
+m1</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ##
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 5580    0    0    0    0
-##          B    0 3797    0    0    0
-##          C    0    0 3422    0    0
-##          D    0    0    0 3216    0
-##          E    0    0    0    0 3607
+##          A 5022    0    0    0    0
+##          B    0 3418    0    0    0
+##          C    0    0 3080    0    0
+##          D    0    0    0 2895    0
+##          E    0    0    0    0 3247
 ##
 ## Overall Statistics
 ##
 ##                Accuracy : 1
 ##                  95% CI : (0.9998, 1)
-##     No Information Rate : 0.2844
-##     P-Value [Acc &gt; NIR] : &lt;2e-16
+##     No Information Rate : 0.2843
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16
 ##
 ##                   Kappa : 1
 ##  Mcnemar's Test P-Value : NA
@@ -171,18 +189,62 @@ confusionMatrix(p, training$classe)</code></pre>
 ## Statistics by Class:
 ##
 ##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity             1.000    1.000    1.000    1.000    1.000
-## Specificity             1.000    1.000    1.000    1.000    1.000
-## Pos Pred Value          1.000    1.000    1.000    1.000    1.000
-## Neg Pred Value          1.000    1.000    1.000    1.000    1.000
-## Prevalence              0.284    0.194    0.174    0.164    0.184
-## Detection Rate          0.284    0.194    0.174    0.164    0.184
-## Detection Prevalence    0.284    0.194    0.174    0.164    0.184
-## Balanced Accuracy       1.000    1.000    1.000    1.000    1.000</code></pre>
+## Sensitivity            1.0000   1.0000   1.0000   1.0000   1.0000
+## Specificity            1.0000   1.0000   1.0000   1.0000   1.0000
+## Pos Pred Value         1.0000   1.0000   1.0000   1.0000   1.0000
+## Neg Pred Value         1.0000   1.0000   1.0000   1.0000   1.0000
+## Prevalence             0.2843   0.1935   0.1744   0.1639   0.1838
+## Detection Rate         0.2843   0.1935   0.1744   0.1639   0.1838
+## Detection Prevalence   0.2843   0.1935   0.1744   0.1639   0.1838
+## Balanced Accuracy      1.0000   1.0000   1.0000   1.0000   1.0000</code></pre>
+<pre class="r"><code>Accuracy1  &lt;- m1$overall[&quot;Accuracy&quot;]</code></pre>
+<p>The accuracy for our model for the training data is 100% with a tight confidence interval.</p>
 </div>
-<div id="prediction-for-the-test-set" class="section level3">
-<h3>Prediction for the test set</h3>
-<pre class="r"><code>predict(modFit, test)</code></pre>
+<div id="evaluating-the-model-test-set" class="section level3">
+<h3>Evaluating the model: test set</h3>
+<p>Now we’ll evaluate the [unbiased] accuracy estimation of our model - based on the test set:</p>
+<pre class="r"><code>p2         &lt;- predict(modFit, test)
+m2         &lt;- confusionMatrix(p2, test$classe)
+m2</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+##
+##           Reference
+## Prediction   A   B   C   D   E
+##          A 555   4   0   0   0
+##          B   3 374   4   0   0
+##          C   0   1 338   7   0
+##          D   0   0   0 312   1
+##          E   0   0   0   2 359
+##
+## Overall Statistics
+##
+##                Accuracy : 0.9888
+##                  95% CI : (0.9831, 0.993)
+##     No Information Rate : 0.2847
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16
+##
+##                   Kappa : 0.9858
+##  Mcnemar's Test P-Value : NA
+##
+## Statistics by Class:
+##
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            0.9946   0.9868   0.9883   0.9720   0.9972
+## Specificity            0.9971   0.9956   0.9951   0.9994   0.9988
+## Pos Pred Value         0.9928   0.9816   0.9769   0.9968   0.9945
+## Neg Pred Value         0.9979   0.9968   0.9975   0.9945   0.9994
+## Prevalence             0.2847   0.1934   0.1745   0.1638   0.1837
+## Detection Rate         0.2832   0.1908   0.1724   0.1592   0.1832
+## Detection Prevalence   0.2852   0.1944   0.1765   0.1597   0.1842
+## Balanced Accuracy      0.9959   0.9912   0.9917   0.9857   0.9980</code></pre>
+<pre class="r"><code>Accuracy2  &lt;- m2$overall[&quot;Accuracy&quot;]</code></pre>
+<p>Based on the test set, the estimated accuracy of our model is 98.877551%, with a tight confidence interval. Hence, the out-of-sample error is 1.122449%.</p>
+<p>The unbiased error estimation turns out to be very similar to the cross-validation error.</p>
+</div>
+<div id="prediction-for-the-unlabeled-set" class="section level3">
+<h3>Prediction for the unlabeled set</h3>
+<p>We will now predict the label for our unlabeled test data:</p>
+<pre class="r"><code>predict(modFit, unlabeled)</code></pre>
 <pre><code>##  [1] B A B A A E D B A A B C B A E E A B B B
 ## Levels: A B C D E</code></pre>
 </div>

@@ -1,3 +1,7 @@
+```{r global_options, include= FALSE}
+options(digits= 7)
+```
+
 ## A Predictive Model for the Weight Lifting Exercises Dataset
 
 ### Synopsis
@@ -8,17 +12,33 @@ The training data used for this project is available at https://d396qusza40orc.c
 
 The model classifies how a weight lifting exercise was executed: Exactly according to the specification (class A), or with with a common mistake type (classes B-E).
 
-### Reading the data
+### Reading and partitioning the data
 
 ```{r}
 library(caret)
 set.seed(123)
 
-training   <- read.csv("pml-training.csv") # training data
-test       <- read.csv("pml-testing.csv" ) # test     data
+labeled    <- read.csv("pml-training.csv") # training+cv+test data
+unlabeled  <- read.csv("pml-testing.csv" ) # unlabeled test   data
 ```
 
-The training data contains `r dim(training)[1]` cases, and `r dim(training)[2]` variables (`r dim(training)[2]-1` predictors, and the true class). The test data contains `r dim(test)[1]` cases.
+The labeled data contains `r dim(labeled)[1]` cases, and `r dim(labeled)[2]` variables (`r dim(labeled)[2]-1` predictors, and the true class). The unlabeled data contains `r dim(unlabeled)[1]` cases.
+
+We'll examine the proportion of the different labels:
+
+```{r}
+prop.table(table(labeled$classe))
+```
+
+We can see that each label has a decent representation in the labeled set.
+
+We'll keep 10% of the labeled data for testing, and use 90% for training/cross-validation (see motivation in "Building the model" below). We'll random-split the labeled data, stratified by the label:
+
+```{r}
+inTrain    <- createDataPartition(y= labeled$classe, p= 0.9, list= F)
+training   <- labeled[ inTrain,]
+test       <- labeled[-inTrain,]
+```
 
 ### Selecting and preprocessing predictors
 
@@ -27,6 +47,7 @@ First we will remove the index column (which is not a predictor)
 ```{r}
 training$X <- NULL
 test$X     <- NULL
+unlabeled$X<- NULL
 ```
 
 Next, we will remove predictors where more than 97% of the values are NA:
@@ -34,8 +55,9 @@ Next, we will remove predictors where more than 97% of the values are NA:
 ```{r}
 percentNA  <- as.vector(colMeans(is.na(training)))
 colsNA     <- which(percentNA > 0.97)
-training   <- training[, -colsNA]
-test       <- test    [, -colsNA]
+training   <- training [, -colsNA]
+test       <- test     [, -colsNA]
+unlabeled  <- unlabeled[, -colsNA]
 ```
 
 We're now left with `r dim(training)[2]-1` predictors.   
@@ -44,8 +66,9 @@ Next, we'll remove all near-zero variance predictors:
 
 ```{r}
 nsv        <- nearZeroVar(training)
-training   <- training[, -nsv]
-test       <- test    [, -nsv]
+training   <- training [, -nsv]
+test       <- test     [, -nsv]
+unlabeled  <- unlabeled[, -nsv]
 ```
 
 We're now left with `r dim(training)[2]-1` predictors.
@@ -54,50 +77,76 @@ We will further reduce the number of predictors using Principal Component Analys
 
 ```{r}
 colsFactor <- as.vector(which(sapply(training, is.factor)))
-preProc    <- preProcess(training[,-colsFactor], method= "pca", thresh= 0.99)
+preProc    <- preProcess(training[, -colsFactor], method= "pca", thresh= 0.99)
 
-training   <- cbind(predict(preProc, training[, -colsFactor]), training[colsFactor])
-test       <- cbind(predict(preProc, test    [, -colsFactor]), test    [colsFactor])
+training   <- cbind(predict(preProc, training [, -colsFactor]), training [colsFactor])
+test       <- cbind(predict(preProc, test     [, -colsFactor]), test     [colsFactor])
+unlabeled  <- cbind(predict(preProc, unlabeled[, -colsFactor]), unlabeled[colsFactor])
 ```
 
 We're now left with `r dim(training)[2]-1` predictors.
 
 ### Building the model
 
-We'll train a random forest model using 10-fold cross validation - on all the training data:
+We'll train a random forest model using 10-fold cross validation. The training process optimizes the mtry parameter (number of variables randomly selected at each tree node). 
 
 ```{r}
 fitControl <- trainControl(method= "cv", number= 10, repeats= 1, verboseIter= F)
 modFit     <- train(classe ~ ., method= "rf" , data= training, trControl= fitControl)
 ```
 
-### Evaluating the model
+Since the validation folds are used to select the final model (best mtry value), the cross-validation error rate estimate may be biased. 
+
+We'll evaluate the accuracy both for the training/cv set and for the test set:
+
+### Evaluating the model: training/cross-validation set
+
+Note: As stated above: this evaluation may be biased.
 
 ```{r}
 modFit
-Accuracy   <- max(modFit$results$Accuracy)
+AccuracyM  <- max(modFit$results$Accuracy)
 ```
 
-Based on the 10-folds cross validation results, the estimated accuracy of the model is `r Accuracy*100`%. 
-Hence, the out-of-sample error is `r (1-Accuracy)*100`%
+Based on the 10-folds cross validation results, the estimated accuracy of the model is `r AccuracyM*100`%, with a tight confidence interval. Hence, the out-of-sample error is `r (1-AccuracyM)*100`%
 
-This Accuracy is the average accuracy for the 10 cross-validation folds:
+This estimated model accuracy is the average accuracy for the 10 cross-validation folds:
 
 ```{r}
 modFit$resample
 mean(modFit$resample$Accuracy)
 ```
 
-
-Running the model on the train set produce the following results:
+Running the model on the training/cv set produce the following results:
 
 ```{r}
-p          <- predict(modFit, training)
-confusionMatrix(p, training$classe)
+p1         <- predict(modFit, training)
+m1         <- confusionMatrix(p1, training$classe)
+m1
+Accuracy1  <- m1$overall["Accuracy"]
 ```
 
-### Prediction for the test set
+The accuracy for our model for the training data is `r Accuracy1*100`% with a tight confidence interval. 
+
+### Evaluating the model: test set
+
+Now we'll evaluate the [unbiased] accuracy estimation of our model - based on the test set:
 
 ```{r}
-predict(modFit, test)
+p2         <- predict(modFit, test)
+m2         <- confusionMatrix(p2, test$classe)
+m2
+Accuracy2  <- m2$overall["Accuracy"]
+```
+
+Based on the test set, the estimated accuracy of our model is `r Accuracy2*100`%, with a tight confidence interval. Hence, the out-of-sample error is `r (1-Accuracy2)*100`%.
+
+The unbiased error estimation turns out to be very similar to the cross-validation error.
+
+### Prediction for the unlabeled set
+
+We will now predict the label for our unlabeled test data:
+
+```{r}
+predict(modFit, unlabeled)
 ```
