@@ -118,12 +118,12 @@ modFit     &lt;- train(classe ~ ., method= &quot;rf&quot; , data= training, trCo
 <pre><code>## Loading required package: randomForest
 ## randomForest 4.6-10
 ## Type rfNews() to see new features/changes/bug fixes.</code></pre>
-<p>Since the validation folds are used to select the final model (best mtry value), the cross-validation error rate estimate may be biased.</p>
 <p>We’ll evaluate the accuracy both for the training/cv set and for the test set:</p>
 </div>
 <div id="evaluating-the-model-trainingcross-validation-set" class="section level3">
 <h3>Evaluating the model: training/cross-validation set</h3>
-<p>Note: As stated above: this evaluation may be biased.</p>
+<p>Since the validation folds are used to select the final model (best mtry value), and since the PCA was extracted from all the training data - the cross-validation error rate estimate may be biased.</p>
+<p>The test set error, which is calculated on the next section is a a more reliable estimate.</p>
 <pre class="r"><code>modFit</code></pre>
 <pre><code>## Random Forest
 ##
@@ -146,7 +146,7 @@ modFit     &lt;- train(classe ~ ., method= &quot;rf&quot; , data= training, trCo
 ## Accuracy was used to select the optimal model using  the largest value.
 ## The final value used for the model was mtry = 32.</code></pre>
 <pre class="r"><code>AccuracyM  &lt;- max(modFit$results$Accuracy)</code></pre>
-<p>Based on the 10-folds cross validation results, the estimated accuracy of the model is 98.7770186%, with a tight confidence interval. Hence, the out-of-sample error is 1.2229814%</p>
+<p>Based on the 10-folds cross validation results, the estimated accuracy of the model is 98.7770186%, with a tight confidence interval.</p>
 <p>This estimated model accuracy is the average accuracy for the 10 cross-validation folds:</p>
 <pre class="r"><code>modFit$resample</code></pre>
 <pre><code>##     Accuracy     Kappa Resample
@@ -198,7 +198,7 @@ m1</code></pre>
 ## Detection Prevalence   0.2843   0.1935   0.1744   0.1639   0.1838
 ## Balanced Accuracy      1.0000   1.0000   1.0000   1.0000   1.0000</code></pre>
 <pre class="r"><code>Accuracy1  &lt;- m1$overall[&quot;Accuracy&quot;]</code></pre>
-<p>The accuracy for our model for the training data is 100% with a tight confidence interval.</p>
+<p>The accuracy for our model for the training data is 100%.</p>
 </div>
 <div id="evaluating-the-model-test-set" class="section level3">
 <h3>Evaluating the model: test set</h3>
@@ -238,7 +238,7 @@ m2</code></pre>
 ## Detection Prevalence   0.2852   0.1944   0.1765   0.1597   0.1842
 ## Balanced Accuracy      0.9959   0.9912   0.9917   0.9857   0.9980</code></pre>
 <pre class="r"><code>Accuracy2  &lt;- m2$overall[&quot;Accuracy&quot;]</code></pre>
-<p>Based on the test set, the estimated accuracy of our model is 98.877551%, with a tight confidence interval. Hence, the out-of-sample error is 1.122449%.</p>
+<p>The unbiased estimated accuracy of our model is 98.877551%, with a tight confidence interval. Hence, the out-of-sample error is 1.122449%.</p>
 <p>The unbiased error estimation turns out to be very similar to the cross-validation error.</p>
 </div>
 <div id="prediction-for-the-unlabeled-set" class="section level3">

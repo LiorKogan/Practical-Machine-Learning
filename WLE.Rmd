@@ -95,20 +95,21 @@ fitControl <- trainControl(method= "cv", number= 10, repeats= 1, verboseIter= F)
 modFit     <- train(classe ~ ., method= "rf" , data= training, trControl= fitControl)
 ```
 
-Since the validation folds are used to select the final model (best mtry value), the cross-validation error rate estimate may be biased. 
 
 We'll evaluate the accuracy both for the training/cv set and for the test set:
 
 ### Evaluating the model: training/cross-validation set
 
-Note: As stated above: this evaluation may be biased.
+Since the validation folds are used to select the final model (best mtry value), and since the PCA was extracted from all the training data - the cross-validation error rate estimate may be biased. 
+
+The test set  error, which is calculated on the next section is a a more reliable estimate.
 
 ```{r}
 modFit
 AccuracyM  <- max(modFit$results$Accuracy)
 ```
 
-Based on the 10-folds cross validation results, the estimated accuracy of the model is `r AccuracyM*100`%, with a tight confidence interval. Hence, the out-of-sample error is `r (1-AccuracyM)*100`%
+Based on the 10-folds cross validation results, the estimated accuracy of the model is `r AccuracyM*100`%, with a tight confidence interval.
 
 This estimated model accuracy is the average accuracy for the 10 cross-validation folds:
 
@@ -126,7 +127,7 @@ m1
 Accuracy1  <- m1$overall["Accuracy"]
 ```
 
-The accuracy for our model for the training data is `r Accuracy1*100`% with a tight confidence interval. 
+The accuracy for our model for the training data is `r Accuracy1*100`%. 
 
 ### Evaluating the model: test set
 
@@ -139,7 +140,7 @@ m2
 Accuracy2  <- m2$overall["Accuracy"]
 ```
 
-Based on the test set, the estimated accuracy of our model is `r Accuracy2*100`%, with a tight confidence interval. Hence, the out-of-sample error is `r (1-Accuracy2)*100`%.
+The unbiased estimated accuracy of our model is `r Accuracy2*100`%, with a tight confidence interval. Hence, the out-of-sample error is `r (1-Accuracy2)*100`%.
 
 The unbiased error estimation turns out to be very similar to the cross-validation error.
 
