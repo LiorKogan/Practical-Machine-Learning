@@ -1,0 +1,22 @@
+{
+    "contents" : "",
+    "created" : 1406563032430.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "C2C1E7C5",
+    "lastKnownWriteTime" : 7741240723082584096,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "caption" : "shuttle",
+        "contentUrl" : "content?title=shuttle&file=34797aafce934465a9eccc1eb8990c44.htm",
+        "displayedObservations" : 256,
+        "displayedVariables" : 7,
+        "totalObservations" : 256,
+        "variables" : 7
+    },
+    "source_on_save" : false,
+    "type" : "r_dataframe"
+}
